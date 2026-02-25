@@ -4,12 +4,11 @@
 namespace ultraglitch::gui
 {
 
-PowerButton::PowerButton(const juce::String& /*buttonName*/)
+PowerButton::PowerButton(const juce::String& buttonName)
 {
-    // LookAndFeel expected to be set globally in PluginEditor
+    juce::ignoreUnused(buttonName);
 
-    // No title text
-    setButtonText(juce::String());
+    setButtonText({});
     setClickingTogglesState(true);
 
     configureButtonStyle();
@@ -17,7 +16,6 @@ PowerButton::PowerButton(const juce::String& /*buttonName*/)
 
 void PowerButton::paint(juce::Graphics& g)
 {
-    // Let LookAndFeel handle drawing
     juce::ToggleButton::paint(g);
 }
 
@@ -28,7 +26,7 @@ void PowerButton::resized()
 
 void PowerButton::configureButtonStyle()
 {
-    setToggleState(false, juce::dontSendNotification); // Default off
+    setToggleState(false, juce::dontSendNotification);
     setOpaque(false);
 }
 
