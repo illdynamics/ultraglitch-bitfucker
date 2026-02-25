@@ -1,5 +1,4 @@
 #include "MainPanel.h"
-#include "LookAndFeel/GlitchLookAndFeel.h"
 #include "../Common/PluginConfig.h"
 #include "../Common/ParameterIDs.h"
 #include "Components/EffectModule.h"
@@ -12,15 +11,14 @@ namespace ultraglitch::gui
 MainPanel::MainPanel(PluginParameters& pluginParams)
     : pluginParameters_(pluginParams)
 {
-    // LookAndFeel is set globally by PluginEditor; no need to set per-component
-
+    setOpaque(false);
     createUiComponents();
-    layoutComponents(); // Initial layout
+    layoutComponents();
 }
 
-void MainPanel::paint(juce::Graphics& g)
+void MainPanel::paint(juce::Graphics& /*g*/)
 {
-    g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId)); // Background color from LF
+    // Transparent: PluginEditor paints the background image.
 }
 
 void MainPanel::resized()
@@ -37,29 +35,23 @@ EffectModule* MainPanel::getEffectModule(int index)
 
 void MainPanel::createUiComponents()
 {
-    // Header Label
-    headerLabel_ = std::make_unique<juce::Label>("headerLabel", "UltraGlitch BitFucker");
-    headerLabel_->setFont(juce::Font(juce::FontOptions(24.0f)).boldened());
-    headerLabel_->setColour(juce::Label::textColourId, findColour(juce::Label::textColourId));
-    headerLabel_->setJustificationType(juce::Justification::centred);
-    addAndMakeVisible(*headerLabel_);
+    // Header label REMOVED (was drawing the green "UltraGlitch BitFucker")
 
     // Global Gain Knob
     globalGainKnob_ = std::make_unique<ultraglitch::gui::GlitchKnob>("Output Gain");
-    globalGainKnob_->setRange(0.0f, 2.0f, 0.01f); // Linear gain 0.0 to 2.0 as per tasq.md
-    globalGainKnob_->setValue(1.0f); // Default 1.0
+    globalGainKnob_->setRange(0.0f, 2.0f, 0.01f);
+    globalGainKnob_->setValue(1.0f);
     addAndMakeVisible(*globalGainKnob_);
 
-    // Chaos Button
+    // Chaos Button (now ghost-painted by ChaosButton.cpp)
     chaosButton_ = std::make_unique<ultraglitch::gui::ChaosButton>("CHAOS MODE");
     addAndMakeVisible(*chaosButton_);
 
-    createEffectModules(); // Create individual effect modules
+    createEffectModules();
 }
 
 void MainPanel::createEffectModules()
 {
-    // BitCrusher
     effectModules_.push_back(std::make_unique<EffectModule>(
         "BitCrusher", pluginParameters_,
         std::vector<juce::String>{
@@ -69,7 +61,6 @@ void MainPanel::createEffectModules()
             ultraglitch::params::BitCrusher_Mix
         }));
 
-    // BufferStutter
     effectModules_.push_back(std::make_unique<EffectModule>(
         "BufferStutter", pluginParameters_,
         std::vector<juce::String>{
@@ -79,7 +70,6 @@ void MainPanel::createEffectModules()
             ultraglitch::params::BufferStutter_Mix
         }));
 
-    // PitchDrift
     effectModules_.push_back(std::make_unique<EffectModule>(
         "PitchDrift", pluginParameters_,
         std::vector<juce::String>{
@@ -88,8 +78,7 @@ void MainPanel::createEffectModules()
             ultraglitch::params::PitchDrift_Speed,
             ultraglitch::params::PitchDrift_Mix
         }));
-    
-    // ReverseSlice
+
     effectModules_.push_back(std::make_unique<EffectModule>(
         "ReverseSlice", pluginParameters_,
         std::vector<juce::String>{
@@ -99,7 +88,6 @@ void MainPanel::createEffectModules()
             ultraglitch::params::ReverseSlice_Mix
         }));
 
-    // SliceRearrange
     effectModules_.push_back(std::make_unique<EffectModule>(
         "SliceRearrange", pluginParameters_,
         std::vector<juce::String>{
@@ -109,7 +97,6 @@ void MainPanel::createEffectModules()
             ultraglitch::params::SliceRearrange_Mix
         }));
 
-    // WeirdFlanger
     effectModules_.push_back(std::make_unique<EffectModule>(
         "WeirdFlanger", pluginParameters_,
         std::vector<juce::String>{
@@ -119,12 +106,11 @@ void MainPanel::createEffectModules()
             ultraglitch::params::WeirdFlanger_Feedback,
             ultraglitch::params::WeirdFlanger_Mix
         }));
-    
-    // ChaosController - special case, only has enabled, speed, intensity
+
     effectModules_.push_back(std::make_unique<EffectModule>(
         "Chaos", pluginParameters_,
         std::vector<juce::String>{
-            ultraglitch::params::Global_ChaosMode, // This is the global enable for Chaos
+            ultraglitch::params::Global_ChaosMode,
             ultraglitch::params::ChaosController_Speed,
             ultraglitch::params::ChaosController_Intensity
         }));
@@ -136,37 +122,53 @@ void MainPanel::createEffectModules()
 void MainPanel::layoutComponents()
 {
     auto bounds = getLocalBounds();
-    
-    // Header
-    headerLabel_->setBounds(bounds.removeFromTop(headerHeight_));
 
-    // Controls at the bottom (Global Gain & Chaos Button)
-    auto footerBounds = bounds.removeFromBottom(bounds.getHeight() * 0.2f); // 20% of remaining height for footer
+    // No header reserved anymore
+
+    // Footer area (gain knob + chaos)
+    auto footerBounds = bounds.removeFromBottom(bounds.getHeight() * 0.2f);
     footerBounds.reduce(padding_, padding_);
 
-    globalGainKnob_->setBounds(footerBounds.removeFromLeft(footerBounds.getWidth() / 2).reduced(padding_));
+    auto gainBounds =
+    footerBounds.removeFromLeft(footerBounds.getWidth() / 2).reduced(padding_);
+
+    int gainDiameter = juce::jmin(gainBounds.getWidth(), gainBounds.getHeight());
+    int gainOffset   = gainDiameter / 4;   // quarter diameter
+    
+    gainBounds.setY(gainBounds.getY() + gainOffset);
+    
+    globalGainKnob_->setBounds(gainBounds);
+
     chaosButton_->setBounds(footerBounds.reduced(padding_));
 
-    // Effect Modules grid (remaining space)
-    auto modulesBounds = bounds; // What's left
+    // Modules fill the rest
+    auto modulesBounds = bounds;
     modulesBounds.reduce(padding_, padding_);
 
     int currentX = modulesBounds.getX();
     int currentY = modulesBounds.getY();
-    int moduleSpacingX = padding_;
-    int moduleSpacingY = padding_;
+    const int moduleSpacingX = padding_;
+    const int moduleSpacingY = padding_;
+    const int modulesPerRow = 3;
 
-    int modulesPerRow = 3; // Example: 3 modules per row
+    moduleWidth_ =
+        (modulesBounds.getWidth() - (modulesPerRow - 1) * moduleSpacingX)
+        / modulesPerRow;
 
-    moduleWidth_ = (modulesBounds.getWidth() - (modulesPerRow - 1) * moduleSpacingX) / modulesPerRow;
-    moduleHeight_ = (modulesBounds.getHeight() - (int)(std::ceil(numEffectModules_ / (float)modulesPerRow) - 1) * moduleSpacingY) / (int)std::ceil(numEffectModules_ / (float)modulesPerRow);
+    moduleHeight_ =
+        (modulesBounds.getHeight()
+         - (int)(std::ceil(numEffectModules_ / (float)modulesPerRow) - 1)
+           * moduleSpacingY)
+        / (int)std::ceil(numEffectModules_ / (float)modulesPerRow);
 
     for (int i = 0; i < numEffectModules_; ++i)
     {
-        effectModules_[i]->setBounds(currentX, currentY, moduleWidth_, moduleHeight_);
+        effectModules_[i]->setBounds(currentX, currentY,
+                                     moduleWidth_, moduleHeight_);
 
         currentX += (moduleWidth_ + moduleSpacingX);
-        if ((i + 1) % modulesPerRow == 0) // Move to next row
+
+        if ((i + 1) % modulesPerRow == 0)
         {
             currentX = modulesBounds.getX();
             currentY += (moduleHeight_ + moduleSpacingY);

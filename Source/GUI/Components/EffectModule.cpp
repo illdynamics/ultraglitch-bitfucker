@@ -12,27 +12,17 @@ EffectModule::EffectModule(const juce::String& moduleName,
       pluginParameters_(pluginParams),
       parameterIDs_(parameterIDs)
 {
-    // LookAndFeel is set globally by PluginEditor; no need to set per-component
-
     createUiComponents();
     setupParameterBindings();
-    layoutComponents(); // Initial layout
-    
-    setInterceptsMouseClicks(true, true); // Allow interaction with this component and its children
+
+    setInterceptsMouseClicks(true, true);
+    setOpaque(false); // allow parent background/texture through
 }
 
-void EffectModule::paint(juce::Graphics& g)
+void EffectModule::paint(juce::Graphics& /*g*/)
 {
-    auto bounds = getLocalBounds().toFloat();
-    auto& lf = getLookAndFeel();
-
-    // Draw background
-    g.setColour(lf.findColour(juce::ResizableWindow::backgroundColourId).darker(0.1f));
-    g.fillRoundedRectangle(bounds, 4.0f);
-
-    // Draw border
-    g.setColour(lf.findColour(juce::Slider::rotarySliderOutlineColourId).darker(0.1f));
-    g.drawRoundedRectangle(bounds, 4.0f, 1.0f);
+    // Draw nothing here: no fills, no borders.
+    // Keeps global background/texture fully visible.
 }
 
 void EffectModule::resized()
@@ -43,72 +33,86 @@ void EffectModule::resized()
 std::vector<GlitchKnob*> EffectModule::getParameterKnobs()
 {
     std::vector<GlitchKnob*> knobs;
+    knobs.reserve(parameterKnobs_.size());
+
     for (auto& knob : parameterKnobs_)
         knobs.push_back(knob.get());
+
     return knobs;
 }
 
 void EffectModule::createUiComponents()
 {
-    // Title Label
-    titleLabel_ = std::make_unique<juce::Label>(moduleName_, moduleName_);
-    titleLabel_->setJustificationType(juce::Justification::centred);
-    titleLabel_->setColour(juce::Label::textColourId, findColour(juce::Label::textColourId));
-    titleLabel_->setFont(juce::Font(juce::FontOptions(16.0f)).boldened());
-    addAndMakeVisible(*titleLabel_);
+    // No title label (requested)
 
-    // Power Button (assuming first parameterID is the enable/bypass for this module)
     powerButton_ = std::make_unique<ultraglitch::gui::PowerButton>("Power");
     addAndMakeVisible(*powerButton_);
 
-    // Create GlitchKnobs for remaining parameters
-    // parameterIDs_ should be ordered: [enable, param1, param2, mix]
-    for (size_t i = 1; i < parameterIDs_.size(); ++i) // Start from 1 to skip enable param
+    for (size_t i = 1; i < parameterIDs_.size(); ++i)
     {
-        // Get parameter name from PluginParameters
         auto paramDef = PluginParameters::get_parameter_definitions();
-        juce::String paramName = "";
-        for (const auto& def : paramDef) {
-            if (def.id == parameterIDs_[i]) {
+        juce::String paramName;
+
+        for (const auto& def : paramDef)
+        {
+            if (def.id == parameterIDs_[i])
+            {
                 paramName = def.name;
                 break;
             }
         }
-        if (paramName.isEmpty()) paramName = "Param " + juce::String(i); // Fallback
-        
+
+        if (paramName.isEmpty())
+            paramName = "Param " + juce::String(i);
+
+        // GlitchKnob now renders no label/text anyway
         auto knob = std::make_unique<ultraglitch::gui::GlitchKnob>(paramName);
         parameterKnobs_.push_back(std::move(knob));
         addAndMakeVisible(*parameterKnobs_.back());
     }
+
+    layoutComponents();
 }
 
 void EffectModule::layoutComponents()
 {
     auto bounds = getLocalBounds();
-    auto padding = 5;
+    const int padding = 6;
 
-    // Title Label at the top
-    titleLabel_->setBounds(padding, padding, bounds.getWidth() - 2 * padding, 20);
+    // ---- POWER BUTTON: square, sized to match your chopped slot ----
+    // Tune this if your artwork slot is slightly different.
+    const int powerSize = 52; // <- try 64..76 if you want tighter fit
+    const int verticalOffset = 32;   // half square size
 
-    // Power Button on the left
-    powerButton_->setBounds(padding, titleLabel_->getBottom() + padding, 50, 50);
+    powerButton_->setBounds(
+        bounds.getX() + padding,
+        bounds.getY() + padding + verticalOffset,
+        powerSize,
+        powerSize
+    );
 
-    // Knobs arranged in a row/grid
-    auto knobArea = bounds.removeFromBottom(bounds.getHeight() - powerButton_->getBottom() - padding);
+    // ---- KNOB AREA: everything below the power button ----
+    auto knobArea = bounds.withTrimmedTop(powerButton_->getBottom() + padding);
     knobArea.reduce(padding, padding);
 
-    int numKnobs = static_cast<int>(parameterKnobs_.size());
-    if (numKnobs > 0)
-    {
-        int knobWidth = (knobArea.getWidth() - (numKnobs - 1) * padding) / numKnobs;
-        int knobHeight = knobArea.getHeight();
+    const int numKnobs = static_cast<int>(parameterKnobs_.size());
+    if (numKnobs <= 0)
+        return;
 
-        for (int i = 0; i < numKnobs; ++i)
-        {
-            parameterKnobs_[i]->setBounds(knobArea.getX() + i * (knobWidth + padding),
-                                          knobArea.getY(),
-                                          knobWidth, knobHeight);
-        }
+    const int knobWidth = (knobArea.getWidth() - (numKnobs - 1) * padding) / numKnobs;
+    const int knobHeight = knobArea.getHeight();
+
+    for (int i = 0; i < numKnobs; ++i)
+    {
+        int knobDiameter = juce::jmin(knobWidth, knobHeight);
+        int knobOffset   = knobDiameter / 2;
+        
+        parameterKnobs_[i]->setBounds(
+            knobArea.getX() + i * (knobWidth + padding),
+            knobArea.getY() + knobOffset,
+            knobWidth,
+            knobHeight
+        );
     }
 }
 
@@ -116,22 +120,22 @@ void EffectModule::setupParameterBindings()
 {
     auto& apvts = pluginParameters_.get_value_tree_state();
 
-    // Bind Power Button (first parameter in the list)
     if (!parameterIDs_.empty())
     {
-        powerButtonAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
-            apvts, parameterIDs_[0], *powerButton_
-        );
+        powerButtonAttachment_ =
+            std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+                apvts, parameterIDs_[0], *powerButton_);
     }
 
-    // Bind GlitchKnobs for remaining parameters
     for (size_t i = 1; i < parameterIDs_.size(); ++i)
     {
-        if (parameterKnobs_.size() >= (i)) // Knob indices match parameterIDs_[1] onwards
+        if (parameterKnobs_.size() >= i)
         {
             knobAttachments_.push_back(
                 std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-                    apvts, parameterIDs_[i], *parameterKnobs_[i-1] // i-1 because knob vector is 0-indexed
+                    apvts,
+                    parameterIDs_[i],
+                    *parameterKnobs_[i - 1]
                 )
             );
         }

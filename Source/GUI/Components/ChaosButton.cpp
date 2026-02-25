@@ -4,30 +4,33 @@
 namespace ultraglitch::gui
 {
 
-ChaosButton::ChaosButton(const juce::String& name)
-    : juce::TextButton (name)
+ChaosButton::ChaosButton(const juce::String& /*name*/)
+    : juce::TextButton(juce::String()) // explicit: avoids {} ambiguity
 {
     setClickingTogglesState(true);
     juce::TextButton::setToggleState(false, juce::dontSendNotification);
+
+    // No text ever
+    setButtonText(juce::String());
+
+    // Make sure NOTHING draws a background via standard colour IDs
+    setColour(juce::TextButton::buttonColourId, juce::Colours::transparentBlack);
+    setColour(juce::TextButton::buttonOnColourId, juce::Colours::transparentBlack);
+    setColour(juce::TextButton::textColourOffId, juce::Colours::transparentBlack);
+    setColour(juce::TextButton::textColourOnId, juce::Colours::transparentBlack);
+
+    // No opaque repaint optimisation that could block parent
+    setOpaque(false);
+
+    // Still clickable even though invisible
+    setInterceptsMouseClicks(true, false);
 }
 
-void ChaosButton::paint(juce::Graphics& g)
+void ChaosButton::paint(juce::Graphics& /*g*/)
 {
-    auto& lf = getLookAndFeel();
-
-    juce::Colour backgroundColour = juce::TextButton::getToggleState()
-        ? lf.findColour(juce::TextButton::buttonOnColourId)
-        : lf.findColour(juce::TextButton::buttonColourId);
-    
-    juce::Colour textColour = juce::TextButton::getToggleState()
-        ? lf.findColour(juce::TextButton::textColourOnId)
-        : lf.findColour(juce::TextButton::textColourOffId);
-
-    lf.drawButtonBackground(g, *this, backgroundColour, isMouseOverOrDragging(), isDown());
-
-    g.setColour(textColour);
-    g.setFont(lf.getTextButtonFont(*this, getHeight()));
-    g.drawFittedText(getButtonText(), getLocalBounds(), juce::Justification::centred, 1);
+    // INTENTIONALLY DRAW NOTHING.
+    // This makes the long CHAOS button disappear visually,
+    // but it still receives clicks and toggles state/attachments.
 }
 
 void ChaosButton::resized()

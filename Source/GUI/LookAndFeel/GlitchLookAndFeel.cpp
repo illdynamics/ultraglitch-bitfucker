@@ -1,5 +1,5 @@
 #include "GlitchLookAndFeel.h"
-#include "../../Common/PluginConfig.h" // For EDITOR_WIDTH etc if needed
+#include "../../Common/PluginConfig.h"
 
 namespace ultraglitch::gui
 {
@@ -28,11 +28,13 @@ GlitchLookAndFeel::GlitchLookAndFeel()
     // Set default font to clean sans-serif
     setDefaultSansSerifTypefaceName("Arial");
 
-    // Additional colour overrides (these were in findColour override, moved here for correctness)
+    // Additional colour overrides
     setColour(juce::ToggleButton::textColourId, getTextColour());
     setColour(juce::TextButton::textColourOffId, getTextColour());
     setColour(juce::Label::backgroundColourId, juce::Colours::transparentBlack);
-    setColour(juce::Slider::backgroundColourId, getPrimaryBackgroundColour().darker(0.1f));
+
+    // IMPORTANT: make slider background effectively transparent so it won't cover the texture
+    setColour(juce::Slider::backgroundColourId, juce::Colours::transparentBlack);
 }
 
 // Helper methods for colors (matching tasq.md requirements)
@@ -43,41 +45,56 @@ juce::Colour GlitchLookAndFeel::getHighlightColour() const { return juce::Colour
 juce::Colour GlitchLookAndFeel::getTextColour() const { return juce::Colour::fromString("#FF00FF00").brighter(0.5f); } // Green
 juce::Colour GlitchLookAndFeel::getDisabledColour() const { return juce::Colour::fromString("#FF505050"); }
 
-void GlitchLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int width, int height,
-                                        float sliderPosProportional, float rotaryStartAngle,
-                                        float rotaryEndAngle, juce::Slider& slider)
+void ultraglitch::gui::GlitchLookAndFeel::drawRotarySlider(juce::Graphics& g,
+                                                          int x, int y, int width, int height,
+                                                          float sliderPosProportional,
+                                                          float rotaryStartAngle,
+                                                          float rotaryEndAngle,
+                                                          juce::Slider& slider)
 {
-    auto outline = slider.findColour(juce::Slider::rotarySliderOutlineColourId);
-    auto fill    = slider.findColour(juce::Slider::rotarySliderFillColourId);
+    auto bounds = juce::Rectangle<float>((float)x, (float)y, (float)width, (float)height).reduced(4.0f);
 
-    auto bounds = juce::Rectangle<float>(x, y, width, height).reduced(1.0f);
-    auto centreX = bounds.getCentreX();
-    auto centreY = bounds.getCentreY();
-    auto radius = juce::jmin(bounds.getWidth(), bounds.getHeight()) / 2.0f;
-    float toAngle = rotaryStartAngle + sliderPosProportional * (rotaryEndAngle - rotaryStartAngle);
+    // Keep it circular
+    const float size   = juce::jmin(bounds.getWidth(), bounds.getHeight());
+    const float radius = size * 0.5f;
+    const float cx     = bounds.getCentreX();
+    const float cy     = bounds.getCentreY();
 
-    // Draw track
-    juce::Path backgroundArc;
-    backgroundArc.addCentredArc(centreX, centreY, radius, radius, 0.0f, rotaryStartAngle, rotaryEndAngle, true);
-    g.setColour(outline);
-    g.strokePath(backgroundArc, juce::PathStrokeType(slider.getTextBoxHeight() * 0.15f, juce::PathStrokeType::mitered, juce::PathStrokeType::rounded));
+    auto r = juce::Rectangle<float>(cx - radius, cy - radius, size, size).reduced(2.0f);
 
-    // Draw filled track based on value
-    if (slider.isEnabled())
-    {
-        juce::Path valueArc;
-        valueArc.addCentredArc(centreX, centreY, radius, radius, 0.0f, rotaryStartAngle, toAngle, true);
-        g.setColour(fill);
-        g.strokePath(valueArc, juce::PathStrokeType(slider.getTextBoxHeight() * 0.15f, juce::PathStrokeType::mitered, juce::PathStrokeType::rounded));
-    }
+    const float angle = rotaryStartAngle + sliderPosProportional * (rotaryEndAngle - rotaryStartAngle);
 
-    // Draw thumb
+    // --- base ring (no rectangle fills, only circle/ring) ---
+    g.setColour(juce::Colours::black.withAlpha(0.35f));
+    g.fillEllipse(r);
+
+    g.setColour(juce::Colours::white.withAlpha(0.18f));
+    g.drawEllipse(r, 2.0f);
+
+    // --- arc / value ring ---
+    juce::Path arc;
+    arc.addCentredArc(cx, cy, radius - 6.0f, radius - 6.0f, 0.0f,
+                      rotaryStartAngle, angle, true);
+
+    g.setColour(getAccentColour().withAlpha(0.75f));
+    g.strokePath(arc, juce::PathStrokeType(3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+    // --- pointer ---
     juce::Path p;
-    auto thumbWidth = slider.getTextBoxHeight() * 0.25f;
-    p.addEllipse(-thumbWidth / 2, -thumbWidth / 2, thumbWidth, thumbWidth);
-    
-    g.setColour(slider.findColour(juce::Slider::thumbColourId)); // Use accent color for thumb
-    g.fillPath(p, juce::AffineTransform::rotation(toAngle).translated(centreX, centreY));
+    const float pointerLen = radius - 10.0f;
+    const float pointerThk = 3.0f;
+
+    p.addRoundedRectangle(-pointerThk * 0.5f, -pointerLen, pointerThk, pointerLen, 1.5f);
+    g.setColour(juce::Colours::white.withAlpha(0.85f));
+    g.fillPath(p, juce::AffineTransform::rotation(angle).translated(cx, cy));
+
+    // --- tiny centre cap ---
+    auto cap = r.reduced(radius * 0.65f);
+    g.setColour(juce::Colours::black.withAlpha(0.45f));
+    g.fillEllipse(cap);
+
+    g.setColour(juce::Colours::white.withAlpha(0.12f));
+    g.drawEllipse(cap, 1.0f);
 }
 
 void GlitchLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, int width, int height,
@@ -85,19 +102,23 @@ void GlitchLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, int wi
                                         const juce::Slider::SliderStyle style, juce::Slider& slider)
 {
     juce::ignoreUnused(minSliderPos, maxSliderPos);
-    g.fillAll(slider.findColour(juce::Slider::backgroundColourId)); // Fill slider background
-    
+
+    // IMPORTANT: do NOT fill the entire slider background -> keeps texture visible behind sliders.
+    // g.fillAll(slider.findColour(juce::Slider::backgroundColourId));
+
     // Draw track
     juce::Rectangle<float> track;
     if (style == juce::Slider::LinearBar || style == juce::Slider::LinearBarVertical)
-        track = slider.isHorizontal() ? juce::Rectangle<float>(x, y + height * 0.5f - 2.0f, width, 4.0f)
-                                      : juce::Rectangle<float>(x + width * 0.5f - 2.0f, y, 4.0f, height);
+        track = slider.isHorizontal()
+                    ? juce::Rectangle<float>((float)x, (float)y + height * 0.5f - 2.0f, (float)width, 4.0f)
+                    : juce::Rectangle<float>((float)x + width * 0.5f - 2.0f, (float)y, 4.0f, (float)height);
     else
-        track = slider.isHorizontal() ? juce::Rectangle<float>(x, y + height * 0.5f - 2.0f, width, 4.0f)
-                                      : juce::Rectangle<float>(x + width * 0.5f - 2.0f, y, 4.0f, height);
+        track = slider.isHorizontal()
+                    ? juce::Rectangle<float>((float)x, (float)y + height * 0.5f - 2.0f, (float)width, 4.0f)
+                    : juce::Rectangle<float>((float)x + width * 0.5f - 2.0f, (float)y, 4.0f, (float)height);
 
-    g.setColour(slider.findColour(juce::Slider::rotarySliderOutlineColourId)); // Use track colour
-    g.fillRect(track);
+    g.setColour(slider.findColour(juce::Slider::rotarySliderOutlineColourId).withAlpha(0.55f));
+    g.fillRoundedRectangle(track, 2.0f);
 
     // Draw fill based on value
     juce::Rectangle<float> fillArea;
@@ -105,9 +126,9 @@ void GlitchLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, int wi
         fillArea = juce::Rectangle<float>(track.getX(), track.getY(), sliderPos - track.getX(), track.getHeight());
     else
         fillArea = juce::Rectangle<float>(track.getX(), sliderPos, track.getWidth(), track.getBottom() - sliderPos);
-    
-    g.setColour(slider.findColour(juce::Slider::rotarySliderFillColourId)); // Use fill colour
-    g.fillRect(fillArea);
+
+    g.setColour(slider.findColour(juce::Slider::rotarySliderFillColourId).withAlpha(0.80f));
+    g.fillRoundedRectangle(fillArea, 2.0f);
 
     // Draw thumb
     juce::Rectangle<float> thumb;
@@ -115,7 +136,7 @@ void GlitchLookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, int wi
         thumb = juce::Rectangle<float>(sliderPos - 5.0f, track.getY() - 3.0f, 10.0f, track.getHeight() + 6.0f);
     else
         thumb = juce::Rectangle<float>(track.getX() - 3.0f, sliderPos - 5.0f, track.getWidth() + 6.0f, 10.0f);
-    
+
     g.setColour(slider.findColour(juce::Slider::thumbColourId));
     g.fillRoundedRectangle(thumb, 2.0f);
 }
@@ -130,41 +151,48 @@ void GlitchLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& bu
 
     if (shouldDrawButtonAsDown || shouldDrawButtonAsHighlighted)
         baseColour = baseColour.brighter(shouldDrawButtonAsDown ? 0.2f : 0.1f);
-    
+
     g.setColour(baseColour);
-    g.fillRoundedRectangle(buttonArea, 4.0f); // Rounded corners
+    g.fillRoundedRectangle(buttonArea, 4.0f);
 
     g.setColour(getAccentColour().darker(0.2f));
-    g.drawRoundedRectangle(buttonArea, 4.0f, 1.0f); // Border
+    g.drawRoundedRectangle(buttonArea, 4.0f, 1.0f);
 }
 
-void GlitchLookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButton& button,
-                                        bool shouldDrawButtonAsHighlighted,
-                                        bool shouldDrawButtonAsDown)
+void GlitchLookAndFeel::drawToggleButton(juce::Graphics& g,
+                                         juce::ToggleButton& button,
+                                         bool isHighlighted,
+                                         bool isDown)
 {
-    auto buttonArea = button.getLocalBounds().toFloat().reduced(2.0f);
-    auto cornerSize = 4.0f;
-    
-    juce::Colour fillColour = button.getToggleState() ? getAccentColour() : getSecondaryBackgroundColour();
-    juce::Colour outlineColour = button.getToggleState() ? getAccentColour().brighter(0.5f) : getDisabledColour();
+    auto bounds = button.getLocalBounds().toFloat();
 
-    if (shouldDrawButtonAsHighlighted)
-        fillColour = fillColour.brighter(0.1f);
+    // Force square inside given bounds
+    float size = std::min(bounds.getWidth(), bounds.getHeight());
+    juce::Rectangle<float> square(
+        bounds.getCentreX() - size * 0.5f,
+        bounds.getCentreY() - size * 0.5f,
+        size,
+        size
+    );
 
-    if (shouldDrawButtonAsDown)
-        fillColour = fillColour.brighter(0.2f);
+    auto isOn = button.getToggleState();
 
-    g.setColour(fillColour);
-    g.fillRoundedRectangle(buttonArea, cornerSize);
-    
-    g.setColour(outlineColour);
-    g.drawRoundedRectangle(buttonArea, cornerSize, 1.5f);
+    // Subtle base outline only
+    g.setColour(juce::Colours::white.withAlpha(0.15f));
+    g.drawRoundedRectangle(square, 6.0f, 2.0f);
 
-    // Draw a "glow" effect if toggled on
-    if (button.getToggleState())
+    if (isOn)
     {
-        drawRoundedRectWithGlow(g, buttonArea, cornerSize, fillColour, getAccentColour(), 0.5f);
+        // Inner glow
+        g.setColour(getAccentColour().withAlpha(0.6f));
+        g.fillRoundedRectangle(square.reduced(6.0f), 4.0f);
+
+        // Outer glow stroke
+        g.setColour(getAccentColour().withAlpha(0.8f));
+        g.drawRoundedRectangle(square, 6.0f, 3.0f);
     }
+
+    // NOTHING else drawn.
 }
 
 void GlitchLookAndFeel::drawComboBox(juce::Graphics& g, int width, int height, bool isButtonDown,
@@ -173,17 +201,19 @@ void GlitchLookAndFeel::drawComboBox(juce::Graphics& g, int width, int height, b
 {
     juce::ignoreUnused(width, height, isButtonDown, buttonY, buttonH);
     auto boxBounds = box.getLocalBounds().toFloat().reduced(1.0f);
+
     g.setColour(box.findColour(juce::ComboBox::backgroundColourId));
     g.fillRoundedRectangle(boxBounds, 4.0f);
 
     g.setColour(box.findColour(juce::ComboBox::outlineColourId));
     g.drawRoundedRectangle(boxBounds, 4.0f, 1.0f);
 
-    // Draw the arrow
+    // Arrow
     juce::Path p;
     p.addTriangle(buttonX + buttonW * 0.2f, (float)height * 0.4f,
                   buttonX + buttonW * 0.8f, (float)height * 0.4f,
                   buttonX + buttonW * 0.5f, (float)height * 0.6f);
+
     g.setColour(box.findColour(juce::ComboBox::arrowColourId));
     g.fillPath(p);
 }
@@ -195,6 +225,7 @@ void GlitchLookAndFeel::drawPopupMenuItem(juce::Graphics& g, const juce::Rectang
                                         const juce::Drawable* icon, const juce::Colour* textColour)
 {
     juce::ignoreUnused(shortcutKeyText, icon);
+
     if (isSeparator)
     {
         auto r = area.reduced(5, 0);
@@ -204,6 +235,7 @@ void GlitchLookAndFeel::drawPopupMenuItem(juce::Graphics& g, const juce::Rectang
     }
 
     auto textRect = area.reduced(2);
+
     if (isHighlighted)
     {
         g.setColour(getHighlightColour());
@@ -219,18 +251,18 @@ void GlitchLookAndFeel::drawPopupMenuItem(juce::Graphics& g, const juce::Rectang
     if (isTicked)
     {
         juce::Path tick;
-        tick.addTriangle(textRect.getX() + 5.0f, textRect.getCentreY(),
-                         textRect.getX() + 10.0f, textRect.getCentreY() + 5.0f,
-                         textRect.getX() + 15.0f, textRect.getCentreY() - 5.0f);
+        tick.addTriangle((float)textRect.getX() + 5.0f, (float)textRect.getCentreY(),
+                         (float)textRect.getX() + 10.0f, (float)textRect.getCentreY() + 5.0f,
+                         (float)textRect.getX() + 15.0f, (float)textRect.getCentreY() - 5.0f);
         g.fillPath(tick);
     }
 
     if (hasSubMenu)
     {
         juce::Path arrow;
-        arrow.addTriangle(textRect.getRight() - 15.0f, textRect.getCentreY() - 5.0f,
-                          textRect.getRight() - 10.0f, textRect.getCentreY(),
-                          textRect.getRight() - 15.0f, textRect.getCentreY() + 5.0f);
+        arrow.addTriangle((float)textRect.getRight() - 15.0f, (float)textRect.getCentreY() - 5.0f,
+                          (float)textRect.getRight() - 10.0f, (float)textRect.getCentreY(),
+                          (float)textRect.getRight() - 15.0f, (float)textRect.getCentreY() + 5.0f);
         g.fillPath(arrow);
     }
 }
@@ -248,7 +280,6 @@ void GlitchLookAndFeel::drawPopupMenuBackground(juce::Graphics& g, int width, in
 void GlitchLookAndFeel::drawBubble(juce::Graphics& g, juce::BubbleComponent& bubble,
                                   const juce::Point<float>& tip, const juce::Rectangle<float>& body)
 {
-    // Default JUCE bubble drawing with custom colours
     juce::LookAndFeel_V4::drawBubble(g, bubble, tip, body);
 }
 
@@ -257,6 +288,7 @@ void GlitchLookAndFeel::drawProgressBar(juce::Graphics& g, juce::ProgressBar& pr
                                        const juce::String& textToShow)
 {
     juce::ignoreUnused(progressBar);
+
     auto bounds = juce::Rectangle<float>(0.0f, 0.0f, (float)width, (float)height).reduced(1.0f);
     g.setColour(getSecondaryBackgroundColour());
     g.fillRoundedRectangle(bounds, 4.0f);
@@ -295,12 +327,10 @@ void GlitchLookAndFeel::drawRoundedRectWithGlow(juce::Graphics& g, const juce::R
                                              float cornerSize, const juce::Colour& fillColour,
                                              const juce::Colour& glowColour, float glowIntensity)
 {
-    // Draw a slightly larger, blurred version of the shape for the glow effect
     auto glowBounds = bounds.expanded(glowIntensity * 5.0f);
     g.setColour(glowColour.withAlpha(glowIntensity));
-    g.fillRoundedRectangle(glowBounds, cornerSize + glowIntensity * 2.0f); // Larger rounded corners for blur effect
-    
-    // Draw the actual shape on top
+    g.fillRoundedRectangle(glowBounds, cornerSize + glowIntensity * 2.0f);
+
     g.setColour(fillColour);
     g.fillRoundedRectangle(bounds, cornerSize);
 }
@@ -308,10 +338,9 @@ void GlitchLookAndFeel::drawRoundedRectWithGlow(juce::Graphics& g, const juce::R
 void GlitchLookAndFeel::drawGlitchPattern(juce::Graphics& g, const juce::Rectangle<float>& area,
                                          const juce::Colour& patternColour, float intensity)
 {
-    // Simple glitch pattern: draw random lines or rectangles
     juce::Random rng;
     g.setColour(patternColour.withAlpha(intensity * 0.5f));
-    
+
     for (int i = 0; i < 5 + (int)(intensity * 20); ++i)
     {
         float x1 = area.getX() + rng.nextFloat() * area.getWidth();

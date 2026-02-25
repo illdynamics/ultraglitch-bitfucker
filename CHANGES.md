@@ -1,5 +1,57 @@
 # CHANGES.md — UltraGlitch BitFucker
 
+## v0.3.0-beta — Universal macOS Binary (arm64 + x86_64)
+
+### Universal Binary Support
+- **CMakeLists.txt**: Added `CMAKE_OSX_ARCHITECTURES "arm64;x86_64"` with FORCE cache — enforces universal fat binary build on macOS regardless of host architecture or CLI flags
+- **CMakeLists.txt**: `CMAKE_OSX_DEPLOYMENT_TARGET` moved to CACHE with FORCE for consistency
+- Single plugin bundle now contains BOTH architecture slices (arm64 + x86_64)
+- Produces ONE `.component` (AU), ONE `.vst3` (VST3), and ONE `.app` (Standalone)
+- Compatible with: native Apple Silicon Logic Pro, Rosetta-mode Logic Pro, and Intel Macs
+- No duplicate plugin entries — same bundle ID, same plugin code, same product name
+- Zero DSP code changes required — full source audit confirmed no architecture-specific code
+
+### Architecture Audit (Verified Clean)
+- Scanned all 39 source files for: `#ifdef arm64`, `#ifdef x86_64`, `__aarch64__`, `__SSE`, `__AVX`, `__NEON`, `vDSP`, `neon`, `immintrin`, `emmintrin`, SIMD intrinsics
+- Result: **ZERO** architecture-specific code found
+- All DSP uses portable C++ math (`std::sin`, `std::pow`, `std::floor`, `std::clamp`)
+- All JUCE modules (`juce_dsp`, `juce_audio_processors`, `juce_gui_basics`, etc.) are architecture-neutral
+- `juce::dsp::DelayLine` (used by PitchDrift) is pure C++ — no platform intrinsics
+
+### Version Bump
+- CMake project version: `0.2.7` → `0.3.0`
+- VERSION file: `v0.2.7-alpha` → `v0.3.0-beta`
+- PluginConfig.h: Updated `PLUGIN_VERSION_STRING`, `PLUGIN_VERSION_MAJOR/MINOR/PATCH`
+
+### Documentation Updates
+- BUILD.md: Updated to v0.3.0-beta, added universal binary build instructions, lipo verification steps, and architecture explanation
+- README.md: Updated version badge, added universal binary feature, updated build instructions
+- DOCUMENTATION.md: Updated build system section with universal binary details
+
+### How It Works (macOS Universal Binary)
+- macOS Mach-O fat binaries contain multiple architecture slices in a single file
+- When Logic Pro (or any host) loads the plugin natively on Apple Silicon, it selects the `arm64` slice
+- When Logic Pro runs under Rosetta 2, it selects the `x86_64` slice
+- Since both slices share the same bundle ID (`com.ultraglitch.audio.ultraglitch`) and plugin code (`UGBF`), macOS sees it as ONE plugin — no duplicates
+- `lipo -info` on the built binary should report: `Architectures in the fat file: arm64 x86_64`
+
+### Build Verification
+```bash
+# Build (no arch flags needed — CMakeLists.txt enforces universal)
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
+
+# Verify universal binary
+lipo -info build/UltraGlitch_artefacts/Release/AU/UltraGlitch\ BitFucker.component/Contents/MacOS/UltraGlitch\ BitFucker
+# Expected: Architectures in the fat file: arm64 x86_64
+
+lipo -info build/UltraGlitch_artefacts/Release/VST3/UltraGlitch\ BitFucker.vst3/Contents/MacOS/UltraGlitch\ BitFucker
+# Expected: Architectures in the fat file: arm64 x86_64
+
+# Verify code signing (optional)
+codesign -vvv build/UltraGlitch_artefacts/Release/AU/UltraGlitch\ BitFucker.component
+```
+
 ## v0.2.7-alpha
 
 ### Compiler Errors Fixed

@@ -1,12 +1,17 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(UltraGlitch VERSION 0.2.7)
+project(UltraGlitch VERSION 0.3.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# ── macOS: Universal Binary (arm64 + x86_64) ────────────────────────────────
+# Produces a single fat binary that works natively on Apple Silicon AND
+# under Rosetta on Intel. macOS automatically loads the correct architecture
+# slice at runtime — no duplicate plugin entries, no conflicting bundle IDs.
 if(APPLE)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.14")
+    set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "Build universal binary for Apple Silicon + Intel" FORCE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.14" CACHE STRING "Minimum macOS deployment target" FORCE)
 endif()
 
 # Fetch JUCE using FetchContent — single source of truth, NO find_package

@@ -146,12 +146,21 @@ The GUI is built around a `MainPanel` which orchestrates several custom componen
 
 The project uses CMake for its build system, ensuring cross-platform compatibility and adherence to modern C++ practices.
 
-*   **Framework:** JUCE 7.x (via `FetchContent`).
+*   **Framework:** JUCE 8.0.3 (via `FetchContent`).
 *   **C++ Standard:** C++17.
 *   **CMake Version:** 3.22+.
 *   **Targets:** VST3, AU (macOS), Standalone.
+*   **macOS Universal Binary:** As of v0.3.0-beta, builds produce fat binaries containing both `arm64` (Apple Silicon) and `x86_64` (Intel/Rosetta) slices. This is enforced in `CMakeLists.txt` via `CMAKE_OSX_ARCHITECTURES "arm64;x86_64"` and requires no command-line flags.
 
-The `CMakeLists.txt` is configured to fetch JUCE automatically, define the plugin properties, and link all source files according to the established directory structure.
+The `CMakeLists.txt` is configured to fetch JUCE automatically, define the plugin properties, enforce universal binary architecture on macOS, and link all source files according to the established directory structure.
+
+### macOS Universal Binary Architecture
+
+macOS Mach-O fat binaries contain multiple architecture slices:
+*   **Native Apple Silicon:** macOS loads the `arm64` slice
+*   **Rosetta 2:** When a host runs under Rosetta, macOS loads the `x86_64` slice
+*   **Intel Mac:** macOS loads the `x86_64` slice natively
+*   Both slices share the same bundle ID (`com.ultraglitch.audio.ultraglitch`) and plugin code (`UGBF`), so the DAW sees ONE plugin — no duplicates
 
 ## 6. Real-Time Safety Considerations
 
