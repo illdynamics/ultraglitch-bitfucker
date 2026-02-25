@@ -27,6 +27,14 @@ else()
     set(ULTRAGLITCH_FORMATS VST3 Standalone)
 endif()
 
+# ── Assets (BinaryData) ──────────────────────────────────────────────────────
+# Put your chopped background image in your repo at: Source/Assets/ugbf1.png
+# (or rename it, but then update the filename here)
+juce_add_binary_data(UltraGlitchBinaryData
+    SOURCES
+        Source/Assets/ugbf1.png
+)
+
 # ── Plugin target ────────────────────────────────────────────────────────────
 juce_add_plugin(UltraGlitch
     COMPANY_NAME "UltraGlitch"
@@ -41,7 +49,7 @@ juce_add_plugin(UltraGlitch
     PLUGIN_MANUFACTURER_CODE UGlc
     PLUGIN_CODE UGBF
 
-    FORMATS AU VST3 Standalone
+    FORMATS ${ULTRAGLITCH_FORMATS}
 
     PRODUCT_NAME "UltraGlitch BitFucker"
 )
@@ -95,6 +103,7 @@ target_link_libraries(UltraGlitch
         juce::juce_graphics
         juce::juce_gui_basics
         juce::juce_gui_extra
+        UltraGlitchBinaryData
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags
