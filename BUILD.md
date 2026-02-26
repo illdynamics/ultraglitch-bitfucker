@@ -1,4 +1,4 @@
-# BUILD — UltraGlitch BitFucker v0.3.0-beta
+# BUILD — UltraGlitch BitFucker v0.4.0-beta
 
 ## Prerequisites
 
@@ -70,18 +70,40 @@ cmake --build build --config Release
 
 ## Windows
 
-### Visual Studio 2022
+> **v0.4.0-beta:** `COPY_PLUGIN_AFTER_BUILD` is now disabled on Windows to avoid
+> permission failures when the VST3 install path points to `C:\Program Files\`.
+> Use the packaging script or manually copy artefacts after building.
+
+### Visual Studio 2022 (recommended)
+
+Use a separate `build-win` directory to keep Windows and macOS builds isolated:
 
 ```powershell
-cmake -B build -G "Visual Studio 17 2022"
-cmake --build build --config Release
+cmake -S . -B build-win -G "Visual Studio 17 2022" -A x64
+cmake --build build-win --config Release
+```
+
+### Automated build + package
+
+```powershell
+.\scripts\build_windows.ps1
+# → Builds Release and copies artefacts to dist\windows-x86_64\
+
+.\scripts\package_release.ps1
+# → Creates v0.4.0-beta.zip with source + dist\
 ```
 
 ### Output Artefacts (Windows)
 
 ```
-build\UltraGlitch_artefacts\Release\VST3\UltraGlitch BitFucker.vst3
-build\UltraGlitch_artefacts\Release\Standalone\UltraGlitch BitFucker.exe
+build-win\UltraGlitch_artefacts\Release\VST3\UltraGlitch BitFucker.vst3\
+build-win\UltraGlitch_artefacts\Release\Standalone\UltraGlitch BitFucker.exe
+```
+
+After `build_windows.ps1`, also available at:
+```
+dist\windows-x86_64\UltraGlitch BitFucker.vst3\
+dist\windows-x86_64\UltraGlitch BitFucker.exe
 ```
 
 Note: AU is not built on Windows (macOS only).

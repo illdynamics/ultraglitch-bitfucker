@@ -40,6 +40,15 @@ void SliceRearrange::process(juce::AudioBuffer<float>& buffer)
     const int numChannels = buffer.getNumChannels();
     const int numSamples = buffer.getNumSamples();
 
+    // Guard: host may deliver blocks larger than maxBlockSize from prepare()
+    if (numSamples > dryBuffer_.getNumSamples() || numChannels > dryBuffer_.getNumChannels())
+    {
+        const int ch = juce::jmax(numChannels, 2);
+        dryBuffer_.setSize(ch, numSamples, false, false, true);
+        blockBuffer_.setSize(ch, numSamples, false, false, true);
+        processedBuffer_.setSize(ch, numSamples, false, false, true);
+    }
+
     // Copy input to dryBuffer_ for mixing later
     for(int ch = 0; ch < numChannels; ++ch)
         dryBuffer_.copyFrom(ch, 0, buffer, ch, 0, numSamples);

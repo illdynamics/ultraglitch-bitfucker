@@ -1,6 +1,6 @@
 # UltraGlitch BitFucker: Cross-Platform Glitch FX Audio Plugin
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-0.3.0--beta-brightgreen)
+![Version](https://img.shields.io/badge/version-0.4.0--beta-brightgreen)
 ![Repo Views](https://komarev.com/ghpvc/?username=illdynamics-ultraglitch-bitfucker&label=Repo+Views&color=blue)
 
 ![Splash](ultraglitch-bitfucker-1280x720.jpg)
@@ -9,7 +9,7 @@
 
 UltraGlitch BitFucker is a multi-effect audio plugin designed for creative glitch production. It provides a suite of destructive and creative effects popular in electronic music, IDM, and sound design, allowing you to mangle and transform your audio in unique ways.
 
-**v0.3.0-beta** builds as a **universal macOS binary** (arm64 + x86_64) — one plugin that works natively on Apple Silicon, under Rosetta 2, and on Intel Macs.
+**v0.4.0-beta** adds Windows build hardening, DSP buffer-size crash guards, and automated packaging scripts. Builds as a **universal macOS binary** (arm64 + x86_64) and **Windows x86_64** (VST3 + Standalone).
 
 ## Features
 
@@ -39,11 +39,22 @@ UltraGlitch BitFucker is a multi-effect audio plugin designed for creative glitc
 
 2.  **Build with CMake:**
     No architecture flags needed — `CMakeLists.txt` enforces universal binary on macOS.
+
+    **macOS / Linux:**
     ```bash
     cmake -B build -DCMAKE_BUILD_TYPE=Release
     cmake --build build --config Release
     ```
-    This will compile the plugin for VST3, AU (macOS), and Standalone formats as universal binaries (arm64 + x86_64).
+
+    **Windows (Visual Studio 2022):**
+    ```powershell
+    cmake -S . -B build-win -G "Visual Studio 17 2022" -A x64
+    cmake --build build-win --config Release
+    ```
+
+    Or use the automated script: `.\scripts\build_windows.ps1`
+
+    This will compile the plugin for VST3, AU (macOS only), and Standalone formats.
 
 3.  **Verify Universal Binary (macOS):**
     ```bash

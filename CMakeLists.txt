@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(UltraGlitch VERSION 0.3.0)
+project(UltraGlitch VERSION 0.4.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -32,6 +32,18 @@ else()
     set(ULTRAGLITCH_FORMATS VST3 Standalone)
 endif()
 
+# ── COPY_PLUGIN_AFTER_BUILD: safe per-platform ───────────────────────────────
+# macOS: copies to ~/Library/Audio/Plug-Ins/ (user-writable, no admin needed)
+# Windows: VST3 install path is under C:\Program Files\ (requires admin,
+#          breaks CI/non-admin shells). Disabled by default; use the install
+#          script or manually copy from the artefacts directory instead.
+# Linux: similar concern to Windows, disabled by default.
+if(APPLE)
+    set(ULTRAGLITCH_COPY_AFTER_BUILD TRUE)
+else()
+    set(ULTRAGLITCH_COPY_AFTER_BUILD FALSE)
+endif()
+
 # ── Assets (BinaryData) ──────────────────────────────────────────────────────
 # Put your chopped background image in your repo at: Source/Assets/ugbf1.png
 # (or rename it, but then update the filename here)
@@ -49,7 +61,7 @@ juce_add_plugin(UltraGlitch
     NEEDS_MIDI_OUTPUT FALSE
     IS_MIDI_EFFECT FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
-    COPY_PLUGIN_AFTER_BUILD TRUE
+    COPY_PLUGIN_AFTER_BUILD ${ULTRAGLITCH_COPY_AFTER_BUILD}
 
     PLUGIN_MANUFACTURER_CODE UGlc
     PLUGIN_CODE UGBF

@@ -1,0 +1,136 @@
+# .github/workflows/build.yml — UltraGlitch BitFucker CI Build
+name: Build UltraGlitch BitFucker
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+# Needed so the workflow can create/upload GitHub Release assets
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure CMake (VS2022 x64)
+        run: cmake -S . -B build-win -G "Visual Studio 17 2022" -A x64
+
+      - name: Build Release
+        run: cmake --build build-win --config Release
+
+      - name: Collect artefacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/windows-x86_64
+          $base = "build-win/UltraGlitch_artefacts/Release"
+          Copy-Item -Recurse "$base/VST3/*" dist/windows-x86_64/
+          Copy-Item "$base/Standalone/*.exe" dist/windows-x86_64/
+
+      - name: Verify artefacts
+        shell: pwsh
+        run: |
+          if (!(Test-Path "dist/windows-x86_64/UltraGlitch BitFucker.vst3")) { throw "VST3 missing" }
+          if (!(Test-Path "dist/windows-x86_64/UltraGlitch BitFucker.exe")) { throw "Standalone missing" }
+          Write-Host "✅ All Windows artefacts verified"
+
+      - name: Upload Windows artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64
+          path: dist/windows-x86_64/
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure CMake (Xcode)
+        run: cmake -B build -G Xcode
+
+      - name: Build Release
+        run: cmake --build build --config Release
+
+      - name: Verify universal binary
+        run: |
+          lipo -info "build/UltraGlitch_artefacts/Release/AU/UltraGlitch BitFucker.component/Contents/MacOS/UltraGlitch BitFucker"
+          lipo -info "build/UltraGlitch_artefacts/Release/VST3/UltraGlitch BitFucker.vst3/Contents/MacOS/UltraGlitch BitFucker"
+
+      - name: Collect artefacts
+        run: |
+          mkdir -p dist/macos-universal
+          cp -R "build/UltraGlitch_artefacts/Release/VST3/UltraGlitch BitFucker.vst3" dist/macos-universal/
+          cp -R "build/UltraGlitch_artefacts/Release/AU/UltraGlitch BitFucker.component" dist/macos-universal/
+          cp -R "build/UltraGlitch_artefacts/Release/Standalone/UltraGlitch BitFucker.app" dist/macos-universal/
+
+      - name: Upload macOS artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-universal
+          path: dist/macos-universal/
+
+  package-release:
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Windows artefacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-x86_64
+          path: dist/windows-x86_64/
+
+      - name: Download macOS artefacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-universal
+          path: dist/macos-universal/
+
+      - name: Package release zips (binaries only)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TAG="${GITHUB_REF_NAME}"   # e.g. v0.4.0-beta
+          BASE="UltraGlitch-BitFucker-${TAG}"
+
+          # Safety: ensure dist exists
+          test -d dist/windows-x86_64
+          test -d dist/macos-universal
+
+          # Create platform zips
+          (cd dist && zip -r "../${BASE}-windows-x86_64.zip" "windows-x86_64" -x "**/.DS_Store")
+          (cd dist && zip -r "../${BASE}-macos-universal.zip" "macos-universal" -x "**/.DS_Store")
+
+          # Create combined zip
+          zip -r "${BASE}-all.zip" dist -x "**/.DS_Store"
+
+          echo "📦 Created:"
+          ls -lh "${BASE}-windows-x86_64.zip" "${BASE}-macos-universal.zip" "${BASE}-all.zip"
+
+          # Optional checksums (nice for users)
+          sha256sum "${BASE}-windows-x86_64.zip" "${BASE}-macos-universal.zip" "${BASE}-all.zip" > "${BASE}-SHA256SUMS.txt"
+          cat "${BASE}-SHA256SUMS.txt"
+
+      - name: Upload release zips as Actions artefacts (backup)
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-zips
+          path: |
+            UltraGlitch-BitFucker-*.zip
+            UltraGlitch-BitFucker-*-SHA256SUMS.txt
+
+      - name: Attach assets to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            UltraGlitch-BitFucker-*.zip
+            UltraGlitch-BitFucker-*-SHA256SUMS.txt
+          generate_release_notes: true
