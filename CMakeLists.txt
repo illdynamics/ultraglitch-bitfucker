@@ -12,6 +12,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(APPLE)
     set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "Build universal binary for Apple Silicon + Intel" FORCE)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "10.14" CACHE STRING "Minimum macOS deployment target" FORCE)
+
+    # JUCE contains Objective-C/Objective-C++ code that still uses manual retain/release in places.
+    # ARC breaks compilation (especially with the Xcode generator / CI). Keep ARC disabled.
+    set(CMAKE_XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC "NO")
 endif()
 
 # Fetch JUCE using FetchContent — single source of truth, NO find_package
@@ -140,7 +144,7 @@ if(APPLE)
         JUCE_PLUGINHOST_AU=1
     )
     set_target_properties(UltraGlitch PROPERTIES
-        XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES
+        XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC NO
         XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT dwarf-with-dsym
     )
 endif()
