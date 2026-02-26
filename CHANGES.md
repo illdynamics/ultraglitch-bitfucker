@@ -1,5 +1,35 @@
 # CHANGES.md — UltraGlitch BitFucker
 
+## v0.4.0-beta — Windows Build Hardening + DSP Crash Guards
+
+### Windows Build Hardening
+- **COPY_PLUGIN_AFTER_BUILD**: Now platform-conditional — enabled on macOS (user-writable plugin dirs), disabled on Windows and Linux (avoids `Program Files` permission failures in CI and non-admin shells)
+- **Separate build directory**: Windows builds now use `build-win/` to avoid colliding with macOS `build/`
+- **scripts/build_windows.ps1**: Automated VS2022 x64 configure → build → collect artefacts to `dist/windows-x86_64/`
+- **scripts/package_release.sh**: Creates release zip with source + compiled binaries, excludes build intermediates
+- **GitHub Actions**: Added `.github/workflows/build.yml` for CI builds on Windows and macOS
+
+### DSP Buffer-Size Crash Guard
+- **Root cause**: Multiple effects allocated internal buffers sized to `maxBlockSize` in `prepare()`, then used `copyFrom(... numSamples ...)` in `process()` without guarding for hosts that deliver larger blocks post-prepare
+- **Fix pattern**: Added runtime resize guard at the top of `process()` in each affected effect — if `numSamples > buffer.getNumSamples()`, resize once with `setSize(..., numSamples, false, false, true)` (preserving data flag = true for safety)
+- **Effects patched**: BufferStutter (dryBuffer_ + stutterOutputBuffer_), PitchDrift (dryBuffer_), ReverseSlice (dryBuffer_), SliceRearrange (dryBuffer_ + blockBuffer_ + processedBuffer_), WeirdFlanger (dryBuffer_)
+- **BitCrusher**: Already had the guard since v0.2.2 — no changes needed
+- **Impact**: Eliminates the "only crashes when audio is playing" class of errors caused by unexpected block sizes from DAW hosts
+
+### Legacy Cleanup
+- **scripts/legacy/**: Moved all Cyqle1-era build scripts (`build.sh`, `configure.sh`, `fetch_juce.sh`, `build_and_test.sh`, `verify_build_environment.cpp`, `analyze_existing_files_and_confirm_build_setup.cpp`, `verify_headers.py`) to `scripts/legacy/` with explanatory README
+- **cmake/PluginConfig.cmake**: Renamed to `.legacy` — references Cyqle1 project and is unused by current FetchContent build
+- No files deleted — everything preserved for reference
+
+### Version Bump
+- All version strings updated to `0.4.0-beta`:
+  - `CMakeLists.txt`: `project(UltraGlitch VERSION 0.4.0)`
+  - `VERSION`: `v0.4.0-beta`
+  - `Source/Common/PluginConfig.h`: `PLUGIN_VERSION_STRING = "0.4.0-beta"`, major=0, minor=4, patch=0
+  - `README.md`: Badge updated
+  - `BUILD.md`: Header updated with new Windows instructions
+  - `CHANGES.md`: This section
+
 ## v0.3.0-beta — Universal macOS Binary (arm64 + x86_64)
 
 ### Universal Binary Support

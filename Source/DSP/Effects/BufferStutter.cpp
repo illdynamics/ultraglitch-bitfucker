@@ -69,6 +69,13 @@ void BufferStutter::process(juce::AudioBuffer<float>& buffer)
     const int numChannels = buffer.getNumChannels();
     const int numSamples = buffer.getNumSamples();
 
+    // Guard: host may deliver blocks larger than maxBlockSize from prepare()
+    if (numSamples > dryBuffer_.getNumSamples() || numChannels > dryBuffer_.getNumChannels())
+    {
+        dryBuffer_.setSize(juce::jmax(numChannels, 2), numSamples, false, false, true);
+        stutterOutputBuffer_.setSize(juce::jmax(numChannels, 2), numSamples, false, false, true);
+    }
+
     // Copy input to dryBuffer_ for mixing later
     for(int ch = 0; ch < numChannels; ++ch)
         dryBuffer_.copyFrom(ch, 0, buffer, ch, 0, numSamples);

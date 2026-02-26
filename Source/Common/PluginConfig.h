@@ -7,9 +7,9 @@ namespace ultraglitch::config
 {
     // Plugin constants
     const juce::String PLUGIN_NAME = "UltraGlitch BitFucker";
-    const juce::String PLUGIN_VERSION_STRING = "0.3.0-beta";
+    const juce::String PLUGIN_VERSION_STRING = "0.4.0-beta";
     const int PLUGIN_VERSION_MAJOR = 0;
-    const int PLUGIN_VERSION_MINOR = 3;
+    const int PLUGIN_VERSION_MINOR = 4;
     const int PLUGIN_VERSION_PATCH = 0;
 
     const juce::String PLUGIN_MANUFACTURER = "UltraGlitch Audio";
