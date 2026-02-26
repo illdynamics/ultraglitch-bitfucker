@@ -8,6 +8,10 @@ on:
   pull_request:
     branches: [main]
 
+# Needed so the workflow can create/upload GitHub Release assets
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -89,16 +93,44 @@ jobs:
           name: macos-universal
           path: dist/macos-universal/
 
-      - name: Package release zip
+      - name: Package release zips (binaries only)
+        shell: bash
         run: |
-          VERSION=$(cat VERSION | tr -d '[:space:]')
-          zip -r "${VERSION}.zip" . \
-            -x ".git/*" "build/*" "build-win/*" ".DS_Store" "*.zip"
-          echo "📦 Created ${VERSION}.zip"
-          ls -lh "${VERSION}.zip"
+          set -euo pipefail
 
-      - name: Upload release zip
+          TAG="${GITHUB_REF_NAME}"   # e.g. v0.4.0-beta
+          BASE="UltraGlitch-BitFucker-${TAG}"
+
+          # Safety: ensure dist exists
+          test -d dist/windows-x86_64
+          test -d dist/macos-universal
+
+          # Create platform zips
+          (cd dist && zip -r "../${BASE}-windows-x86_64.zip" "windows-x86_64" -x "**/.DS_Store")
+          (cd dist && zip -r "../${BASE}-macos-universal.zip" "macos-universal" -x "**/.DS_Store")
+
+          # Create combined zip
+          zip -r "${BASE}-all.zip" dist -x "**/.DS_Store"
+
+          echo "📦 Created:"
+          ls -lh "${BASE}-windows-x86_64.zip" "${BASE}-macos-universal.zip" "${BASE}-all.zip"
+
+          # Optional checksums (nice for users)
+          sha256sum "${BASE}-windows-x86_64.zip" "${BASE}-macos-universal.zip" "${BASE}-all.zip" > "${BASE}-SHA256SUMS.txt"
+          cat "${BASE}-SHA256SUMS.txt"
+
+      - name: Upload release zips as Actions artefacts (backup)
         uses: actions/upload-artifact@v4
         with:
-          name: release-zip
-          path: "*.zip"
+          name: release-zips
+          path: |
+            UltraGlitch-BitFucker-*.zip
+            UltraGlitch-BitFucker-*-SHA256SUMS.txt
+
+      - name: Attach assets to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            UltraGlitch-BitFucker-*.zip
+            UltraGlitch-BitFucker-*-SHA256SUMS.txt
+          generate_release_notes: true
